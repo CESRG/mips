@@ -2,8 +2,10 @@
 -- From Section 7.6 of Digital Design & Computer Architecture
 -- Updated to VHDL 2008 26 July 2011 David_Harris@hmc.edu
 
-library IEEE;
+library IEEE; 
 use IEEE.STD_LOGIC_1164.all; use IEEE.NUMERIC_STD_UNSIGNED.all;
+use STD.TEXTIO.all;
+use IEEE.STD_LOGIC_ARITH.all;
 
 entity testbench is
 end;
@@ -49,13 +51,39 @@ begin
   end process;
 end;
 
-
+----------------------------------------------------------------------------------------------
 library IEEE; 
 use IEEE.STD_LOGIC_1164.all; use IEEE.NUMERIC_STD_UNSIGNED.all;
 use STD.TEXTIO.all;
 use IEEE.STD_LOGIC_ARITH.all;
+entity registrador_n is
+  generic (constant N: integer := 8);
+  port (clock, clear, enable: in STD_LOGIC;
+        D: in STD_LOGIC_VECTOR(N-1 downto 0);
+        Q: out STD_LOGIC_VECTOR (N-1 downto 0));
+end registrador_n;
+
+architecture registrador_n of registrador_n is
+  signal IQ: STD_LOGIC_VECTOR(N-1 downto 0); -- sinal Q interno
+begin
+
+process(clock, clear, enable, IQ)
+  begin
+    if (clear = '1') then IQ <= (others => '0');
+    elsif (clock'event and clock='1') then
+      if (enable='1') then IQ <= D; end if;
+    end if;
+    Q <= IQ;
+  end process;
+  
+end registrador_n;
+
 
 ----------------------------------------------------------------------------------------------
+library IEEE; 
+use IEEE.STD_LOGIC_1164.all; use IEEE.NUMERIC_STD_UNSIGNED.all;
+use STD.TEXTIO.all;
+use IEEE.STD_LOGIC_ARITH.all;library IEEE;
 
 entity hazarddec is
   port( branch, branch_id, branch_ex    : in  std_logic;
@@ -94,32 +122,12 @@ begin
   flushid  <= jumpid or s_conflito or branch_id or branch_ex or pcsrc_mem;
 end hazarddec_arc;
 
-----------------------------------------------------------------------------------------------
-
-entity registrador_n is
-  generic (constant N: integer := 8);
-  port (clock, clear, enable: in STD_LOGIC;
-        D: in STD_LOGIC_VECTOR(N-1 downto 0);
-        Q: out STD_LOGIC_VECTOR (N-1 downto 0));
-end registrador_n;
-
-architecture registrador_n of registrador_n is
-  signal IQ: STD_LOGIC_VECTOR(N-1 downto 0); -- sinal Q interno
-begin
-
-process(clock, clear, enable, IQ)
-  begin
-    if (clear = '1') then IQ <= (others => '0');
-    elsif (clock'event and clock='1') then
-      if (enable='1') then IQ <= D; end if;
-    end if;
-    Q <= IQ;
-  end process;
-  
-end registrador_n;
-
 
 ----------------------------------------------------------------------------------------------
+library IEEE; 
+use IEEE.STD_LOGIC_1164.all; use IEEE.NUMERIC_STD_UNSIGNED.all;
+use STD.TEXTIO.all;
+use IEEE.STD_LOGIC_ARITH.all;
 
 entity mux2 is -- two-input multiplexer
   generic(width: integer);
@@ -134,6 +142,10 @@ begin
 end;
 
 ----------------------------------------------------------------------------------------------
+library IEEE; 
+use IEEE.STD_LOGIC_1164.all; use IEEE.NUMERIC_STD_UNSIGNED.all;
+use STD.TEXTIO.all;
+use IEEE.STD_LOGIC_ARITH.all;
 
 entity signext is -- sign extender
   port(a: in  STD_LOGIC_VECTOR(15 downto 0);
@@ -152,6 +164,10 @@ begin
 end;
 
 ----------------------------------------------------------------------------------------------
+library IEEE; 
+use IEEE.STD_LOGIC_1164.all; use IEEE.NUMERIC_STD_UNSIGNED.all;
+use STD.TEXTIO.all;
+use IEEE.STD_LOGIC_ARITH.all;
 
 entity sl2 is -- shift left by 2
   port(a: in  STD_LOGIC_VECTOR(31 downto 0);
@@ -164,6 +180,10 @@ begin
 end;
 
 ----------------------------------------------------------------------------------------------
+library IEEE; 
+use IEEE.STD_LOGIC_1164.all; use IEEE.NUMERIC_STD_UNSIGNED.all;
+use STD.TEXTIO.all;
+use IEEE.STD_LOGIC_ARITH.all;
 
 entity adder is -- adder
   port(a, b: in  STD_LOGIC_VECTOR(31 downto 0);
@@ -176,6 +196,10 @@ begin
 end;
 
 ----------------------------------------------------------------------------------------------
+library IEEE; 
+use IEEE.STD_LOGIC_1164.all; use IEEE.NUMERIC_STD_UNSIGNED.all;
+use STD.TEXTIO.all;
+use IEEE.STD_LOGIC_ARITH.all;
 
 entity regfile is -- three-port register file
   port(clk:           in  STD_LOGIC;
@@ -212,6 +236,10 @@ begin
 end;
 
 ----------------------------------------------------------------------------------------------
+library IEEE; 
+use IEEE.STD_LOGIC_1164.all; use IEEE.NUMERIC_STD_UNSIGNED.all;
+use STD.TEXTIO.all;
+use IEEE.STD_LOGIC_ARITH.all;
 
 entity alu is 
   port(a, b:       in  STD_LOGIC_VECTOR(31 downto 0);
@@ -240,6 +268,10 @@ begin
 end;
 
 ----------------------------------------------------------------------------------------------
+library IEEE; 
+use IEEE.STD_LOGIC_1164.all; use IEEE.NUMERIC_STD_UNSIGNED.all;
+use STD.TEXTIO.all;
+use IEEE.STD_LOGIC_ARITH.all;
 
 entity datapath is  -- MIPS datapath
   port( clk, reset, c:     in  STD_LOGIC;
@@ -464,6 +496,10 @@ begin
 end;
 
 ----------------------------------------------------------------------------------------------
+library IEEE; 
+use IEEE.STD_LOGIC_1164.all; use IEEE.NUMERIC_STD_UNSIGNED.all;
+use STD.TEXTIO.all;
+use IEEE.STD_LOGIC_ARITH.all;
 
 entity maindec is -- main control decoder
   port(op:                 in  STD_LOGIC_VECTOR(5 downto 0);
@@ -496,6 +532,10 @@ begin
 end;
 
 ----------------------------------------------------------------------------------------------
+library IEEE; 
+use IEEE.STD_LOGIC_1164.all; use IEEE.NUMERIC_STD_UNSIGNED.all;
+use STD.TEXTIO.all;
+use IEEE.STD_LOGIC_ARITH.all;
 
 entity aludec is -- ALU control decoder
   port(funct:      in  STD_LOGIC_VECTOR(5 downto 0);
@@ -523,6 +563,10 @@ begin
 end;
 
 ----------------------------------------------------------------------------------------------
+library IEEE; 
+use IEEE.STD_LOGIC_1164.all; use IEEE.NUMERIC_STD_UNSIGNED.all;
+use STD.TEXTIO.all;
+use IEEE.STD_LOGIC_ARITH.all;
 
 entity controller is -- single cycle control decoder
   port(op, funct:          in  STD_LOGIC_VECTOR(5 downto 0);
@@ -556,6 +600,10 @@ begin
 end;
 
 ----------------------------------------------------------------------------------------------
+library IEEE; 
+use IEEE.STD_LOGIC_1164.all; use IEEE.NUMERIC_STD_UNSIGNED.all;
+use STD.TEXTIO.all;
+use IEEE.STD_LOGIC_ARITH.all;
 
 entity mips is -- single cycle MIPS processor
   port(clk, reset:        in  STD_LOGIC;
@@ -605,6 +653,10 @@ end;
 
 
 ----------------------------------------------------------------------------------------------
+library IEEE; 
+use IEEE.STD_LOGIC_1164.all; use IEEE.NUMERIC_STD_UNSIGNED.all;
+use STD.TEXTIO.all;
+use IEEE.STD_LOGIC_ARITH.all;
 
 entity imem is -- instruction memory
   port(a:  in  STD_LOGIC_VECTOR(5 downto 0);
@@ -653,6 +705,10 @@ begin
 end;
 
 ----------------------------------------------------------------------------------------------
+library IEEE; 
+use IEEE.STD_LOGIC_1164.all; use IEEE.NUMERIC_STD_UNSIGNED.all;
+use STD.TEXTIO.all;
+use IEEE.STD_LOGIC_ARITH.all;
 
 entity dmem is -- data memory
   port(clk, we:  in STD_LOGIC;
@@ -680,6 +736,11 @@ begin
 end;
 
 ----------------------------------------------------------------------------------------------
+library IEEE; 
+use IEEE.STD_LOGIC_1164.all; use IEEE.NUMERIC_STD_UNSIGNED.all;
+use STD.TEXTIO.all;
+use IEEE.STD_LOGIC_ARITH.all;
+
 entity top is -- top-level design for testing
   port(clk, reset:           in     STD_LOGIC;
        writedata, dataadr:   buffer STD_LOGIC_VECTOR(31 downto 0);
