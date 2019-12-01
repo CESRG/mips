@@ -633,6 +633,8 @@ process(clock, clear, enable, IQ)
 end registrador_n;
 
 ----------------------------------------------------------------------------------------------
+library IEEE; use IEEE.STD_LOGIC_1164.all;  use IEEE.STD_LOGIC_ARITH.all;
+
 entity flopr is -- flip-flop with synchronous reset
   generic(width: integer);
   port(clk, reset: in  STD_LOGIC;
