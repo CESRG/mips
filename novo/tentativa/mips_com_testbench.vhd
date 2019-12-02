@@ -50,6 +50,36 @@ begin
     end if;
   end process;
 end;
+----------------------------------------------------------------------------------------------
+library IEEE; 
+use IEEE.STD_LOGIC_1164.all; use IEEE.NUMERIC_STD_UNSIGNED.all;
+use STD.TEXTIO.all;
+use IEEE.STD_LOGIC_ARITH.all;
+
+entity dmem is -- data memory
+  port(clk, we:  in STD_LOGIC;
+       a, wd:    in STD_LOGIC_VECTOR(31 downto 0);
+       rd:       out STD_LOGIC_VECTOR(31 downto 0));
+end;
+
+architecture behave of dmem is
+begin
+  process is
+    type ramtype is array (63 downto 0) of STD_LOGIC_VECTOR(31 downto 0);
+    variable mem: ramtype;
+  begin
+    -- read or write memory
+    loop
+      if clk'event and clk = '1' then
+          if (we = '1') then mem(to_integer(a(7 downto 2))) := wd;
+          end if;
+      end if;
+      rd <= mem(to_integer(a(7 downto 2))); 
+      wait on clk, a;
+    end loop;
+
+  end process;
+end;
 
 ----------------------------------------------------------------------------------------------
 library IEEE; 
@@ -91,36 +121,6 @@ begin
   dmem1: dmem port map(clk, memwrite, dataadr, writedata, readdata);
 end;
 
-----------------------------------------------------------------------------------------------
-library IEEE; 
-use IEEE.STD_LOGIC_1164.all; use IEEE.NUMERIC_STD_UNSIGNED.all;
-use STD.TEXTIO.all;
-use IEEE.STD_LOGIC_ARITH.all;
-
-entity dmem is -- data memory
-  port(clk, we:  in STD_LOGIC;
-       a, wd:    in STD_LOGIC_VECTOR(31 downto 0);
-       rd:       out STD_LOGIC_VECTOR(31 downto 0));
-end;
-
-architecture behave of dmem is
-begin
-  process is
-    type ramtype is array (63 downto 0) of STD_LOGIC_VECTOR(31 downto 0);
-    variable mem: ramtype;
-  begin
-    -- read or write memory
-    loop
-      if clk'event and clk = '1' then
-          if (we = '1') then mem(to_integer(a(7 downto 2))) := wd;
-          end if;
-      end if;
-      rd <= mem(to_integer(a(7 downto 2))); 
-      wait on clk, a;
-    end loop;
-
-  end process;
-end;
 
 ----------------------------------------------------------------------------------------------
 library IEEE; 
@@ -192,35 +192,38 @@ end;
 architecture struct of mips is
   component controller
     port(op, funct:          in  STD_LOGIC_VECTOR(5 downto 0);
-         zero:               in  STD_LOGIC;
          memtoreg, memwrite: out STD_LOGIC;
-         pcsrc, alusrc:      out STD_LOGIC;
+         branch, alusrc, c:   out STD_LOGIC;
          regdst, regwrite:   out STD_LOGIC;
          jump:               out STD_LOGIC;
          alucontrol:         out STD_LOGIC_VECTOR(2 downto 0));
-  end component;
+  end component;   
+  
   component datapath
-    port(clk, reset:        in  STD_LOGIC;
-         memtoreg, pcsrc:   in  STD_LOGIC;
+    port(clk, reset, c:     in  STD_LOGIC;
+         memtoreg, branch:   in  STD_LOGIC;
          alusrc, regdst:    in  STD_LOGIC;
          regwrite, jump:    in  STD_LOGIC;
+     memwrite:      in std_logic;  
+     memwritepip:   out std_logic;
          alucontrol:        in  STD_LOGIC_VECTOR(2 downto 0);
-         zero:              out STD_LOGIC;
          pc:                buffer STD_LOGIC_VECTOR(31 downto 0);
          instr:             in STD_LOGIC_VECTOR(31 downto 0);
          aluout, writedata: buffer STD_LOGIC_VECTOR(31 downto 0);
-         readdata:          in  STD_LOGIC_VECTOR(31 downto 0));
+         readdata:          in  STD_LOGIC_VECTOR(31 downto 0);
+     op, funct:         out std_logic_vector(5 downto 0));
   end component;
-  signal memtoreg, alusrc, regdst, regwrite, jump, pcsrc: STD_LOGIC;
-  signal zero: STD_LOGIC;
+  
+  signal memtoreg, alusrc, regdst, regwrite, jump, branch, s_c, s_memwrite: STD_LOGIC;
   signal alucontrol: STD_LOGIC_VECTOR(2 downto 0);
+  signal s_op, s_funct: std_logic_vector(5 downto 0);
 begin
-  cont: controller port map(instr(31 downto 26), instr(5 downto 0),
-                            zero, memtoreg, memwrite, pcsrc, alusrc,
+  cont: controller port map(s_op, s_funct,
+                memtoreg, s_memwrite, branch, alusrc, s_c,
                             regdst, regwrite, jump, alucontrol);
-  dp: datapath port map(clk, reset, memtoreg, pcsrc, alusrc, regdst,
-                        regwrite, jump, alucontrol, zero, pc, instr,
-                        aluout, writedata, readdata);
+  dp: datapath port map(clk, reset, s_c, memtoreg, branch, alusrc, regdst,
+                        regwrite, jump, s_memwrite, memwrite, alucontrol, pc, instr,
+                        aluout, writedata, readdata, s_op, s_funct);
 end;
 
 ----------------------------------------------------------------------------------------------
@@ -231,37 +234,33 @@ use IEEE.STD_LOGIC_ARITH.all;
 
 entity controller is -- single cycle control decoder
   port(op, funct:          in  STD_LOGIC_VECTOR(5 downto 0);
-       zero:               in  STD_LOGIC;
        memtoreg, memwrite: out STD_LOGIC;
-       pcsrc, alusrc:      out STD_LOGIC;
+       branch, alusrc, c:   out STD_LOGIC;
        regdst, regwrite:   out STD_LOGIC;
        jump:               out STD_LOGIC;
        alucontrol:         out STD_LOGIC_VECTOR(2 downto 0));
 end;
 
-
 architecture struct of controller is
   component maindec
     port(op:                 in  STD_LOGIC_VECTOR(5 downto 0);
          memtoreg, memwrite: out STD_LOGIC;
-         branch, alusrc:     out STD_LOGIC;
+         branch, alusrc, c:  out STD_LOGIC;
          regdst, regwrite:   out STD_LOGIC;
          jump:               out STD_LOGIC;
          aluop:              out STD_LOGIC_VECTOR(1 downto 0));
-  end component;
+  end component;  
+  
   component aludec
     port(funct:      in  STD_LOGIC_VECTOR(5 downto 0);
          aluop:      in  STD_LOGIC_VECTOR(1 downto 0);
          alucontrol: out STD_LOGIC_VECTOR(2 downto 0));
   end component;
   signal aluop:  STD_LOGIC_VECTOR(1 downto 0);
-  signal branch: STD_LOGIC;
 begin
   md: maindec port map(op, memtoreg, memwrite, branch,
-                       alusrc, regdst, regwrite, jump, aluop);
+                       alusrc, c, regdst, regwrite, jump, aluop);
   ad: aludec port map(funct, aluop, alucontrol);
-
-  pcsrc <= branch and zero;
 end;
 ----------------------------------------------------------------------------------------------
 library IEEE; 
@@ -279,10 +278,11 @@ architecture behave of aludec is
 begin
   process(all) begin
     case aluop is
-      when "00" => alucontrol <= "010"; -- add (for lw/sw/addi)
-      when "01" => alucontrol <= "110"; -- sub (for beq)
-      when others => case funct is      -- R-type instructions
-                         when "100000" => alucontrol <= "010"; -- add
+    when "00" => alucontrol <= "010"; -- add (for lw/sw/addi)
+    when "01" => alucontrol <= "110"; -- sub (for beq/bne)
+    when "11" => alucontrol <= "001"; -- or  (for ori)
+    when others => case funct is      -- R-type instructions
+                         when "100000" => alucontrol <= "010"; -- add 
                          when "100010" => alucontrol <= "110"; -- sub
                          when "100100" => alucontrol <= "000"; -- and
                          when "100101" => alucontrol <= "001"; -- or
@@ -302,32 +302,31 @@ use IEEE.STD_LOGIC_ARITH.all;
 entity maindec is -- main control decoder
   port(op:                 in  STD_LOGIC_VECTOR(5 downto 0);
        memtoreg, memwrite: out STD_LOGIC;
-       branch, alusrc:     out STD_LOGIC;
+       branch, alusrc, c:  out STD_LOGIC;
        regdst, regwrite:   out STD_LOGIC;
        jump:               out STD_LOGIC;
        aluop:              out STD_LOGIC_VECTOR(1 downto 0));
 end;
 
 architecture behave of maindec is
-  signal controls: STD_LOGIC_VECTOR(8 downto 0);
+  signal controls: STD_LOGIC_VECTOR(9 downto 0);
 begin
   process(all) begin
     case op is
-      when "000000" => controls <= "110000010"; -- RTYPE
-      when "100011" => controls <= "101001000"; -- LW
-      when "101011" => controls <= "001010000"; -- SW
-      when "000100" => controls <= "000100001"; -- BEQ
-      when "001000" => controls <= "101000000"; -- ADDI
-      when "000010" => controls <= "000000100"; -- J
-      when others   => controls <= "---------"; -- illegal op
+      when "000000" => controls <= "1100000100"; -- RTYPE
+      when "100011" => controls <= "1010010000"; -- LW
+      when "101011" => controls <= "0010100000"; -- SW
+      when "000100" => controls <= "0001000010"; -- BEQ
+    when "000101" => controls <= "0001000010"; -- BNE   
+      when "001000" => controls <= "1010000000"; -- ADDI
+      when "000010" => controls <= "0000001000"; -- J 
+    when "001101" => controls <= "1010000111";  -- ORI
+      when others   => controls <= "----------"; -- illegal op
     end case;
   end process;
 
-  -- (regwrite, regdst, alusrc, branch, memwrite,
-  --  memtoreg, jump, aluop(1 downto 0)) <= controls;
- (regwrite, regdst, alusrc, branch, memwrite,
-  memtoreg, jump) <= controls(8 downto 2);
-  aluop <= controls(1 downto 0);
+  (regwrite, regdst, alusrc, branch, memwrite,
+   memtoreg, jump, aluop(1 downto 0), c) <= controls;
 end;
 
 ----------------------------------------------------------------------------------------------
@@ -337,87 +336,227 @@ use STD.TEXTIO.all;
 use IEEE.STD_LOGIC_ARITH.all;
 
 entity datapath is  -- MIPS datapath
-  port(clk, reset:        in  STD_LOGIC;
-       memtoreg, pcsrc:   in  STD_LOGIC;
-       alusrc, regdst:    in  STD_LOGIC;
-       regwrite, jump:    in  STD_LOGIC;
-       alucontrol:        in  STD_LOGIC_VECTOR(2 downto 0);
-       zero:              out STD_LOGIC;
-       pc:                buffer STD_LOGIC_VECTOR(31 downto 0);
-       instr:             in  STD_LOGIC_VECTOR(31 downto 0);
-       aluout, writedata: buffer STD_LOGIC_VECTOR(31 downto 0);
-       readdata:          in  STD_LOGIC_VECTOR(31 downto 0));
+  port( clk, reset, c:     in  STD_LOGIC;
+      memtoreg, branch:  in  STD_LOGIC;
+      alusrc, regdst:    in  STD_LOGIC;
+      regwrite, jump:    in  STD_LOGIC;
+      memwrite:      in  std_logic;
+      memwritepip:     out std_logic;
+      alucontrol:        in  STD_LOGIC_VECTOR(2 downto 0);
+      pc:                buffer STD_LOGIC_VECTOR(31 downto 0);
+      instr:             in  STD_LOGIC_VECTOR(31 downto 0);
+      aluout, writedata: buffer STD_LOGIC_VECTOR(31 downto 0);
+      readdata:          in  STD_LOGIC_VECTOR(31 downto 0);
+      op, funct:         out std_logic_vector(5 downto 0));
+      
 end;
 
 architecture struct of datapath is
   component alu
-    port(a, b:       in  STD_LOGIC_VECTOR(31 downto 0);
-         alucontrol: in  STD_LOGIC_VECTOR(2 downto 0);
-         result:     buffer STD_LOGIC_VECTOR(31 downto 0);
-         zero:       out STD_LOGIC);
-  end component;
+    port( a, b:       in  STD_LOGIC_VECTOR(31 downto 0);
+        alucontrol: in  STD_LOGIC_VECTOR(2 downto 0);
+        result:     buffer STD_LOGIC_VECTOR(31 downto 0);
+        zero:       out STD_LOGIC);
+  end component;  
+  
   component regfile
-    port(clk:           in  STD_LOGIC;
-         we3:           in  STD_LOGIC;
-         ra1, ra2, wa3: in  STD_LOGIC_VECTOR(4 downto 0);
-         wd3:           in  STD_LOGIC_VECTOR(31 downto 0);
-         rd1, rd2:      out STD_LOGIC_VECTOR(31 downto 0));
-  end component;
+    port( clk:           in  STD_LOGIC;
+        we3:           in  STD_LOGIC;
+        ra1, ra2, wa3: in  STD_LOGIC_VECTOR(4 downto 0);
+        wd3:           in  STD_LOGIC_VECTOR(31 downto 0);
+        rd1, rd2:      out STD_LOGIC_VECTOR(31 downto 0));
+  end component;  
+  
   component adder
-    port(a, b: in  STD_LOGIC_VECTOR(31 downto 0);
-         y:    out STD_LOGIC_VECTOR(31 downto 0));
+    port( a, b: in  STD_LOGIC_VECTOR(31 downto 0);
+        y:    out STD_LOGIC_VECTOR(31 downto 0));
   end component;
+  
   component sl2
-    port(a: in  STD_LOGIC_VECTOR(31 downto 0);
-         y: out STD_LOGIC_VECTOR(31 downto 0));
+    port( a: in  STD_LOGIC_VECTOR(31 downto 0);
+        y: out STD_LOGIC_VECTOR(31 downto 0));
+  end component; 
+  
+  component signext                          
+    port( a: in  STD_LOGIC_VECTOR(15 downto 0);
+          c: in  STD_LOGIC; -- c = '0' arit, c = '1' logical
+          y: out STD_LOGIC_VECTOR(31 downto 0));
+  end component;  
+     
+  component mux2 
+    generic(width: integer);
+    port( d0, d1: in  STD_LOGIC_VECTOR(width-1 downto 0);
+        s:      in  STD_LOGIC;
+            y:      out STD_LOGIC_VECTOR(width-1 downto 0));
+  end component; 
+  
+  component registrador_n is 
+    generic(constant N: integer := 8);
+    port( clock, clear, enable: in STD_LOGIC;
+        D: in STD_LOGIC_VECTOR(N-1 downto 0);
+            Q: out STD_LOGIC_VECTOR (N-1 downto 0));
   end component;
-  component signext
-    port(a: in  STD_LOGIC_VECTOR(15 downto 0);
-         y: out STD_LOGIC_VECTOR(31 downto 0));
+  
+  component hazarddec is
+    port( branch, branch_id, branch_ex    : in  std_logic;
+        pcsrc, pcsrc_mem          : in  std_logic;
+      jump, jumpid, memwrite, alusrc, wid, wex  : in  std_logic;
+      r1, r2, rid, rex          : in  std_logic_vector(4 downto 0);
+      enablepc, flushid, enableif     : out std_logic);
   end component;
-  component flopr generic(width: integer);
-    port(clk, reset: in  STD_LOGIC;
-         d:          in  STD_LOGIC_VECTOR(width-1 downto 0);
-         q:          out STD_LOGIC_VECTOR(width-1 downto 0));
-  end component;
-  component mux2 generic(width: integer);
-    port(d0, d1: in  STD_LOGIC_VECTOR(width-1 downto 0);
-         s:      in  STD_LOGIC;
-         y:      out STD_LOGIC_VECTOR(width-1 downto 0));
-  end component;
+  
   signal writereg:           STD_LOGIC_VECTOR(4 downto 0);
-  signal pcjump, pcnext,
-         pcnextbr, pcplus4,
+  signal pcjump, pcnext, 
+         pcnextbr, pcplus4, 
          pcbranch:           STD_LOGIC_VECTOR(31 downto 0);
   signal signimm, signimmsh: STD_LOGIC_VECTOR(31 downto 0);
   signal srca, srcb, result: STD_LOGIC_VECTOR(31 downto 0);
+  signal s_aluout, s_writedata : std_logic_vector(31 downto 0);
+  signal s_zero, pcsrc : std_logic;
+  
+  --sinais pos pipeline                        
+  signal s_if  : std_logic_vector( 63 downto 0); 
+  signal s_id  : std_logic_vector(142 downto 0);  
+  signal s_ex  : std_logic_vector(106 downto 0);
+  signal s_mem : std_logic_vector( 71 downto 0);
+  
+  signal s_rid, s_rex : std_logic_vector(4 downto 0);
+  
+  -- hazard control unity
+  signal s_enable_pc, s_flush_id, s_enable_if, s_pcsrc_mem : std_logic; 
+  signal s_control_id : std_logic_vector(9 downto 0);
+  signal s_jump : std_logic;
 begin
-  -- next PC logic
-  pcjump <= pcplus4(31 downto 28) & instr(25 downto 0) & "00";
-  pcreg: flopr generic map(32) port map(clk, reset, pcnext, pc);
-  pcadd1: adder port map(pc, X"00000004", pcplus4);
-  immsh: sl2 port map(signimm, signimmsh);
-  pcadd2: adder port map(pcplus4, signimmsh, pcbranch);
-  pcbrmux: mux2 generic map(32) port map(pcplus4, pcbranch,
-                                         pcsrc, pcnextbr);
-  pcmux: mux2 generic map(32) port map(pcnextbr, pcjump, jump, pcnext);
-
-  -- register file logic
-  rf: regfile port map(clk, regwrite, instr(25 downto 21),
-                       instr(20 downto 16), writereg, result, srca,
-        writedata);
-  wrmux: mux2 generic map(5) port map(instr(20 downto 16),
-                                      instr(15 downto 11),
-                                      regdst, writereg);
-  resmux: mux2 generic map(32) port map(aluout, readdata,
-                                        memtoreg, result);
-  se: signext port map(instr(15 downto 0), signimm);
-
-  -- ALU logic
-  srcbmux: mux2 generic map(32) port map(writedata, signimm, alusrc,
-                                         srcb);
-  mainalu: alu port map(srca, srcb, alucontrol, aluout, zero);
+ 
+  pcbrmux: mux2 
+    generic map(32) 
+    port map(pcplus4, pcbranch, pcsrc, pcnextbr);  
+    
+  pcmux: mux2 
+    generic map(32) 
+    port map(pcnextbr, pcjump, s_jump, pcnext);
+                                         
+  pcreg: registrador_n
+    generic map(32)
+      port map( clk, reset, s_enable_pc,
+              pcnext,
+              pc);
+    
+  pcadd1: adder 
+    port map(pc, X"00000004", pcplus4);
+  
+  ----------------------------------   
+  -- PcPlus4 (63 downto 32) |Instruction (31 downto 0)
+  if_reg : registrador_n
+    generic map(64)
+    port map( clk, reset, s_enable_if,
+          pcplus4 & instr,
+            s_if);
+  ----------------------------------
+  
+  op    <= s_if(31 downto 26);
+  funct <= s_if( 5 downto  0);
+  
+  wrmux: mux2 
+    generic map(5) 
+    port map( s_if(20 downto 16), 
+          s_if(15 downto 11), 
+          regdst, writereg);
+          
+  rf: regfile 
+    port map( clk, s_mem(0),
+          s_if(25 downto 21), s_if(20 downto 16),
+          s_mem(5 downto 1), result, 
+          srca, s_writedata); 
+  
+  -- Imediate
+    se: signext 
+      port map(s_if(15 downto 0),c, signimm);
+    
+  -- Jump  
+  pcjump <= s_if(63 downto 60) & s_if(25 downto 0) & "00"; -- endereço jump 
+  s_jump <= jump and not s_flush_id;
+  
+  --flush 
+   flush_id_mux: mux2 
+    generic map(10) 
+    port map( jump & alusrc & alucontrol & s_if(26) & branch & memwrite & memtoreg & regwrite, 
+          "00" & X"00", 
+          s_flush_id, s_control_id); 
+          
+  ----------------------------------  
+  -- jump (142) | alusource (141) | alucontrol (140 downto 138)||
+  -- inst0 (137) | branch (136) | memwrite (135) || memtoreg (134)
+  -- Pcplus4 (133 downto 102)|Reg1 (101 downto 70)|Reg2 (69 downto 38)|
+  -- Imediate (37 dwonto 6)| WriteAddress (5 downto 1) | WriteEnable (0)
+  
+  id_reg : registrador_n
+    generic map(143)
+    port map( clk, reset, '1',
+          s_control_id(9 downto 1) &
+          s_if(63 downto 32) & srca & s_writedata & signimm & writereg & s_control_id(0),
+            s_id);
+  ----------------------------------
+     
+  -- PC Logic
+  immsh: sl2 
+    port map(s_id(37 downto 6), signimmsh);   
+  
+  pcadd2: adder 
+    port map(s_id(133 downto 102), signimmsh, pcbranch);
+      
+  -- ALU   
+  srcbmux: mux2 
+    generic map(32) 
+    port map(s_id(69 downto 38), s_id(37 downto 6), s_id(141),srcb);  
+  
+  mainalu: alu 
+    port map(s_id(101 downto 70), srcb, s_id(140 downto 138), s_aluout, s_zero);
+       
+  ----------------------------------
+  -- inst0 (106) | branch (105) | memwrite (104) || memtoreg (103)
+  -- PcBranch (102 downto 71)| zero (70)| AluOut (69 downto 38)| Reg2 (37 downto 6)|
+  -- WriteAddress (5 downto 1) | WriteEnable (0)
+  ex_reg : registrador_n
+    generic map(107)
+    port map( clk, reset, '1',
+          s_id(137 downto 134) & pcbranch & s_zero & s_aluout & s_id(69 downto 38) & s_id(5 downto 0),
+            s_ex);
+  ----------------------------------
+                   
+  memwritepip <= s_ex(104);
+  pcsrc     <= s_ex(105) and (s_ex(70) xor s_ex(106));
+  aluout    <= s_ex(69 downto 38);
+  writedata   <= s_ex(37 downto 6);
+        
+  ----------------------------------
+  -- pcsrc(71) | memtoreg (70)
+  -- ReadData (69 downto 38) | AluOut (37 downto 6) |
+  -- WriteAddress (5 downto 1) | WriteEnable (0)
+  mem_reg : registrador_n
+    generic map(72)
+    port map( clk, reset, '1',
+          pcsrc & s_ex(103) & readdata & s_ex(69 downto 38) & s_ex(5 downto 0),
+            s_mem);
+  ----------------------------------
+  
+  resmux: mux2 
+    generic map(32) 
+    port map( s_mem(37 downto 6), s_mem(69 downto 38), 
+          s_mem(70), result); 
+      
+  ----------------------------------
+  -- Hazard control unity
+  
+  haz : hazarddec
+  port map(   branch, s_id(136), s_ex(105), 
+          pcsrc, s_mem(71),
+          jump, s_id(142), memwrite, alusrc, s_id(0), s_ex(0), 
+          s_if(25 downto 21), s_if(20 downto 16), s_id(5 downto 1), s_ex(5 downto 1),
+          s_enable_pc, s_flush_id, s_enable_if);  
+        
 end;
+
 ----------------------------------------------------------------------------------------------
 library IEEE; 
 use IEEE.STD_LOGIC_1164.all; use IEEE.NUMERIC_STD_UNSIGNED.all;
@@ -632,22 +771,3 @@ process(clock, clear, enable, IQ)
   
 end registrador_n;
 
-----------------------------------------------------------------------------------------------
-library IEEE; use IEEE.STD_LOGIC_1164.all;  use IEEE.STD_LOGIC_ARITH.all;
-
-entity flopr is -- flip-flop with synchronous reset
-  generic(width: integer);
-  port(clk, reset: in  STD_LOGIC;
-       d:          in  STD_LOGIC_VECTOR(width-1 downto 0);
-       q:          out STD_LOGIC_VECTOR(width-1 downto 0));
-end;
-
-architecture asynchronous of flopr is
-begin
-  process(clk, reset) begin
-    if reset then  q <= (others => '0');
-    elsif rising_edge(clk) then
-      q <= d;
-    end if;
-  end process;
-end;
