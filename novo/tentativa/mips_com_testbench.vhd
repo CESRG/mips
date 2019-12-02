@@ -317,16 +317,19 @@ begin
       when "100011" => controls <= "1010010000"; -- LW
       when "101011" => controls <= "0010100000"; -- SW
       when "000100" => controls <= "0001000010"; -- BEQ
-    when "000101" => controls <= "0001000010"; -- BNE   
+      when "000101" => controls <= "0001000010"; -- BNE   
       when "001000" => controls <= "1010000000"; -- ADDI
       when "000010" => controls <= "0000001000"; -- J 
-    when "001101" => controls <= "1010000111";  -- ORI
+      when "001101" => controls <= "1010000111";  -- ORI
       when others   => controls <= "----------"; -- illegal op
     end case;
   end process;
 
+  --(regwrite, regdst, alusrc, branch, memwrite,
+  -- memtoreg, jump, aluop(1 downto 0), c) <= controls;
   (regwrite, regdst, alusrc, branch, memwrite,
-   memtoreg, jump, aluop(1 downto 0), c) <= controls;
+  memtoreg, jump) <= controls(8 downto 2);
+  aluop <= controls(1 downto 0);
 end;
 
 ----------------------------------------------------------------------------------------------
